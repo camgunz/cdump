@@ -2,3 +2,5 @@
 build
 dist
 cdump.egg-info
+.python-version
+__pycache__

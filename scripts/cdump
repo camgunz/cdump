@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
+import pprint
 import argparse
 
-from cdump.database import Database
+import msgpack
+
 from cdump.definitions import Definitions
 from cdump.parser import Parser
 from cdump.xml_dump import XMLDump
@@ -13,19 +15,21 @@ def dump_ast(file_path):
 
 
 def dump_definitions(file_path):
-    def id_gen():
-        id = 1
-        while True:
-            yield id
-            id += 1
-    for definition in Parser(id_gen(), XMLDump.FromFilePath(file_path)):
+    for definition in Parser(XMLDump.FromFilePath(file_path)):
         print(definition)
 
 
-def dump_to_db(db_file_name, file_paths):
-    Database(db_file_name).write_definitions(
-        Definitions.FromFilePaths(file_paths)
-    )
+def serialize_to_file(mp_file_name, file_paths):
+    with open(mp_file_name, 'wb') as fobj:
+        for definition in Definitions.FromFilePaths(file_paths):
+            msgpack.pack(definition.to_dict(), fobj, use_bin_type=True)
+
+
+def deserialize_from_file(file_path):
+    with open(file_path, 'rb') as fobj:
+        unpacker = msgpack.Unpacker(fobj, raw=False)
+        for definition in unpacker:
+            pprint.pprint(definition)
 
 
 def main():
@@ -35,14 +39,19 @@ def main():
     dump_subparser.add_argument('input_file', type=str, help='File to dump')
     parse_subparser = subparsers.add_parser('parse')
     parse_subparser.add_argument('input_file', type=str, help='File to parse')
-    db_subparser = subparsers.add_parser('db')
-    db_subparser.add_argument(
-        '-f', '--file', type=str,
-        help='SQLite database file to save definitions in'
+    serialize_subparser = subparsers.add_parser('serialize')
+    serialize_subparser.add_argument(
+        '-o', '--output', type=str,
+        help='Output for serialized definitions to'
     )
-    db_subparser.add_argument(
+    serialize_subparser.add_argument(
         'input_files', type=str, nargs='+',
         help='Files to process'
+    )
+    deserialize_subparser = subparsers.add_parser('deserialize')
+    deserialize_subparser.add_argument(
+        'input_file', type=str,
+        help='File to deserialize'
     )
 
     args = parser.parse_args()
@@ -51,8 +60,10 @@ def main():
         dump_ast(args.input_file)
     elif args.action == 'parse':
         dump_definitions(args.input_file)
-    elif args.action == 'db':
-        dump_to_db(args.file, args.input_files)
+    elif args.action == 'serialize':
+        serialize_to_file(args.output, args.input_files)
+    elif args.action == 'deserialize':
+        deserialize_from_file(args.input_file)
 
 
 main()

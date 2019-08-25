@@ -47,7 +47,6 @@ class XMLDump:
             elif node.tag == 'ElaboratedType':
                 if node.get('type') == record_id:
                     break
-                node_type = node.get('type')
                 node = self.find_by_id(node.get('type'), modifiers, record_id)
             else:
                 break

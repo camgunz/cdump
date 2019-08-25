@@ -1,8 +1,9 @@
 .PHONY: test dumptest parsetest install
 
 test: install
-	rm -f defs.db
-	cdump db -f defs.db /usr/include/stdlib.h /usr/include/stdio.h
+	rm -f defs.mp
+	cdump serialize -o defs.mp /usr/include/stdlib.h /usr/include/stdio.h
+	cdump deserialize defs.mp
 
 dumptest: install
 	cdump dump /usr/include/stdio.h
