@@ -5,7 +5,7 @@ import argparse
 
 import msgpack
 
-from cdump.definitions import Definitions
+from cdump import parse_definitions
 from cdump.parser import Parser
 from cdump.xml_dump import XMLDump
 
@@ -21,7 +21,7 @@ def dump_definitions(file_path):
 
 def serialize_to_file(mp_file_name, file_paths):
     with open(mp_file_name, 'wb') as fobj:
-        for definition in Definitions.FromFilePaths(file_paths):
+        for name, definition in parse_definitions(file_paths).items():
             msgpack.pack(definition.to_dict(), fobj, use_bin_type=True)
 
 

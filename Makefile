@@ -1,4 +1,4 @@
-.PHONY: test dumptest parsetest install
+.PHONY: test dumptest parsetest install help
 
 test: install
 	rm -f defs.mp
