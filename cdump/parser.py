@@ -1,152 +1,187 @@
-from .cobjects import (
-    Array, Builtin, Enumeration, EnumerationValue, Field, Function,
-    FunctionType, Parameter, AnonymousParameter, SelfReference,
-    Struct, Typedef, Unimplemented, Union
+from itertools import chain
+from collections import OrderedDict
+
+from clang.cindex import Config, CursorKind, Index, TypeKind
+
+from .cdefs import (
+    Array,
+    BlockFunctionPointer,
+    BlockPointer,
+    BuiltinBool,
+    BuiltinFloatingPoint,
+    BuiltinInteger,
+    BuiltinVoid,
+    Enum,
+    Function,
+    FunctionPointer,
+    Pointer,
+    Reference,
+    Struct,
+    Typedef,
+    Union
 )
-from .utils import elemstr, intattr
+
+from .utils import id_gen
+
+
+_BUILTIN_FLOATING_POINTS = [
+    TypeKind.HALF,
+    TypeKind.FLOAT,
+    TypeKind.DOUBLE,
+    TypeKind.LONGDOUBLE,
+    TypeKind.FLOAT128,
+]
+
+
+_BUILTIN_INTEGERS = [
+    TypeKind.CHAR16,
+    TypeKind.CHAR32,
+    TypeKind.CHAR_S,
+    TypeKind.CHAR_U,
+    TypeKind.INT,
+    TypeKind.INT128,
+    TypeKind.LONG,
+    TypeKind.LONGLONG,
+    TypeKind.SCHAR,
+    TypeKind.SHORT,
+    TypeKind.UCHAR,
+    TypeKind.UINT,
+    TypeKind.UINT128,
+    TypeKind.ULONG,
+    TypeKind.ULONGLONG,
+    TypeKind.USHORT,
+    TypeKind.WCHAR,
+]
 
 
 class Parser:
 
-    TOP_LEVEL_TAGS = [
-        'FundamentalType', 'Enumeration', 'ArrayType', 'Typedef',
-        'Struct', 'Union', 'FunctionType', 'Function',
-    ]
+    def __init__(self, libclang=None):
+        if libclang:
+            Config.set_library_file(libclang)
 
-    def __init__(self, xml):
-        self.xml = xml
+    def _handle_typedef(self, cursor):
+        typedef_type = cursor.underlying_typedef_type
+        if typedef_type.kind == TypeKind.ELABORATED:
+            typedef_type = Reference(typedef_type.spelling)
+        else:
+            typedef_type = self._handle_type(typedef_type)
+        return Typedef(cursor.spelling, typedef_type)
 
-    def __iter__(self):
-        return self.get_iterator()
-
-    # pylint: disable=no-self-use
-    def parse_fundamental_type_node(self, node):
-        return Builtin(
-            node.get('name'),
-            int(node.get('size')),
-            int(node.get('align'))
+    def _handle_union(self, cursor):
+        return Union(
+            f'union {cursor.type.spelling}',
+            list(map(self._handle_cursor, cursor.get_children()))
         )
 
-    # pylint: disable=no-self-use
-    def parse_enumeration_node(self, node):
-        return Enumeration(node.get('name'), [
-            EnumerationValue(
-                enum_value_node.get('name'),
-                int(enum_value_node.get('init'))
-            )
-            for enum_value_node in node.iterfind('EnumValue')
-        ])
-
-    def parse_array_type_node(self, node):
-        mods = []
-        elem_type_node = self.xml.find_by_id(node.get('type'), mods)
-        return Array(
-            self.modified_reference_for_node(elem_type_node, mods),
-            intattr(node, 'min'),
-            intattr(node, 'max'),
+    def _handle_struct(self, cursor):
+        return Struct(
+            cursor.spelling,
+            OrderedDict([
+                (child.spelling, self._handle_cursor(child))
+                for child in cursor.get_children()
+            ])
         )
 
-    def parse_typedef_node(self, node):
-        mods = []
-        type_node = self.xml.find_by_id(node.get('type'), mods)
-        return Typedef(
-            node.get('name'),
-            self.modified_reference_for_node(type_node, mods)
+    def _handle_enum(self, cursor):
+        return Enum(
+            self._handle_type(cursor.enum_type),
+            OrderedDict([
+                (child.spelling, child.enum_value)
+                for child in cursor.get_children()
+            ])
         )
 
-    def parse_field_node(self, node, outer_id):
-        mods = []
-        type_node = self.xml.find_by_id(
-            node.get('type'),
-            mods,
-            outer_id
-        ) if node.tag == 'Field' else node
-        return Field(
-            node.get('name'),
-            self.modified_reference_for_node(type_node, mods)
-        )
-
-    def parse_argument_nodes(self, parent):
-        parameters = []
-        for argument_node in parent.iterfind('Argument'):
-            mods = []
-            type_node = self.xml.find_by_id(argument_node.get('type'), mods)
-            parameters.append(
-                Parameter(
-                    argument_node.get('name'),
-                    self.modified_reference_for_node(type_node, mods)
-                ) if argument_node.get('name')
-                else AnonymousParameter(
-                    self.modified_reference_for_node(type_node, mods)
-                )
-            )
-        return parameters
-
-    def parse_struct_node(self, node):
-        return Struct(node.get('name'), [
-            self.parse_field_node(self.xml.find_by_id(
-                field_id,
-                [],
-                node.get('id')
-            ), node.get('id')) for field_id in node.get('members').split()
-        ]) if node.get('members') else Struct(node.get('name'))
-
-    def parse_union_node(self, node):
-        return Union(node.get('name'), [
-            self.parse_field_node(self.xml.find_by_id(
-                field_id,
-                [],
-                node.get('id')
-            ), node.get('id')) for field_id in node.get('members').split()
-        ])
-
-    def parse_function_type_node(self, node):
-        mods = []
-        return_type_node = self.xml.find_by_id(node.get('returns'), mods)
-        return FunctionType(
-            self.parse_argument_nodes(node),
-            self.modified_reference_for_node(return_type_node, mods)
-        )
-
-    def parse_function_node(self, node):
-        mods = []
-        return_type_node = self.xml.find_by_id(node.get('returns'), mods)
+    def _handle_function(self, cursor):
+        ids = id_gen()
         return Function(
-            node.get('name'),
-            self.parse_argument_nodes(node),
-            self.modified_reference_for_node(return_type_node, mods)
+            cursor.spelling,
+            OrderedDict([
+                (param.spelling or next(ids), self._handle_type(param.type))
+                for param in cursor.get_arguments()
+            ]),
+            self._handle_type(cursor.result_type)
         )
 
-    def object_for_node(self, node):
-        if node.tag == 'FundamentalType':
-            return self.parse_fundamental_type_node(node)
-        if node.tag == 'Enumeration':
-            return self.parse_enumeration_node(node)
-        if node.tag == 'ArrayType':
-            return self.parse_array_type_node(node)
-        if node.tag == 'Typedef':
-            return self.parse_typedef_node(node)
-        if node.tag == 'Struct':
-            return self.parse_struct_node(node)
-        if node.tag == 'Union':
-            return self.parse_union_node(node)
-        if node.tag == 'FunctionType':
-            return self.parse_function_type_node(node)
-        if node.tag == 'Function':
-            return self.parse_function_node(node)
-        if node.tag == 'ElaboratedType':
-            return SelfReference()
-        if node.tag == 'Unimplemented':
-            return Unimplemented()
-        raise Exception(f'No object for {elemstr(node)}')
+    def _handle_type(self, ctype):
+        if ctype.kind == TypeKind.VOID:
+            return BuiltinVoid()
+        if ctype.kind == TypeKind.BOOL:
+            return BuiltinBoolean(ctype.get_size(), ctype.get_align())
+        if ctype.kind in _BUILTIN_INTEGERS:
+            return BuiltinInteger(
+                ctype.spelling,
+                ctype.get_size(),
+                ctype.get_align()
+            )
+        if ctype.kind in _BUILTIN_FLOATING_POINTS:
+            return BuiltinFloatingPoint(
+                ctype.spelling,
+                ctype.get_size(),
+                ctype.get_align()
+            )
+        if ctype.kind == TypeKind.CONSTANTARRAY:
+            return Array(ctype.element_type.spelling, ctype.element_count)
+        if ctype.kind == TypeKind.TYPEDEF:
+            return Reference(ctype.spelling)
+        if ctype.kind == TypeKind.ELABORATED:
+            return Reference(ctype.spelling)
+        if ctype.kind == TypeKind.POINTER:
+            pointee = ctype.get_pointee()
+            if pointee.kind == TypeKind.FUNCTIONPROTO:
+                return FunctionPointer(
+                    list(map(self._handle_type, pointee.argument_types())),
+                    self._handle_type(pointee.get_result())
+                )
+            return Pointer(self._handle_type(pointee))
+        if ctype.kind == TypeKind.BLOCKPOINTER:
+            pointee = ctype.get_pointee()
+            if pointee.kind == TypeKind.FUNCTIONPROTO:
+                return BlockFunctionPointer(
+                    list(map(self._handle_type, pointee.argument_types())),
+                    self._handle_type(pointee.get_result())
+                )
+            return BlockPointer(self._handle_type(pointee))
+        if ctype.kind == TypeKind.INCOMPLETEARRAY:
+            return Array(ctype.element_type.spelling)
+        print(f'Unknown ctype.kind {ctype.kind} ({ctype.spelling})')
+        import pdb
+        pdb.set_trace()
 
-    def modified_reference_for_node(self, node, modifiers):
-        return self.object_for_node(node).get_modified_reference(modifiers)
+    def _handle_field(self, cursor):
+        return self._handle_type(cursor.type)
 
-    def get_iterator(self):
-        for node in self.xml.iterfind('FundamentalType'):
-            yield self.object_for_node(node)
+    def _handle_cursor(self, cursor):
+        if cursor.kind == CursorKind.TRANSLATION_UNIT:
+            return
+        if cursor.kind == CursorKind.VAR_DECL:
+            return
+        if cursor.kind == CursorKind.TYPEDEF_DECL:
+            return self._handle_typedef(cursor)
+        elif cursor.kind == CursorKind.UNION_DECL:
+            return self._handle_union(cursor)
+        elif cursor.kind == CursorKind.FIELD_DECL:
+            return self._handle_field(cursor)
+        elif cursor.kind == CursorKind.STRUCT_DECL:
+            return self._handle_struct(cursor)
+        elif cursor.kind == CursorKind.ENUM_DECL:
+            return self._handle_enum(cursor)
+        elif cursor.kind == CursorKind.FUNCTION_DECL:
+            return self._handle_function(cursor)
+        print(f'Unknown cursor.kind {cursor.kind} ({cursor.spelling})')
+        import pdb
+        pdb.set_trace()
 
-        for node in self.xml.iter():
-            if node.tag in self.TOP_LEVEL_TAGS:
-                yield self.object_for_node(node)
+    def _walk(self, cursor):
+        cdef = self._handle_cursor(cursor)
+        if cdef:
+            yield self._handle_cursor(cursor)
+        for child in cursor.get_children():
+            cdef = self._handle_cursor(child)
+            if cdef:
+                yield cdef
+
+    def parse(self, file_path):
+        index = Index.create()
+        translation_unit = index.parse(file_path)
+        return self._walk(translation_unit.cursor)

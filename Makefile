@@ -1,18 +1,15 @@
-.PHONY: test dumptest parsetest install help
+.PHONY: test parsetest install help
 
 test: install
 	rm -f defs.mp
-	cdump serialize -o defs.mp /usr/include/stdlib.h /usr/include/stdio.h
+	cdump serialize --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' -o defs.mp /usr/include/stdlib.h /usr/include/stdio.h
 	cdump deserialize defs.mp
 
-dumptest: install
-	cdump dump /usr/include/stdio.h
-
 parsetest: install
-	cdump parse /usr/include/stdlib.h
+	cdump parse --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' /usr/include/stdlib.h
 
 install:
 	python setup.py install
 
 help:
-	@echo "Commands: test | dumptest | parsetest | install"
+	@echo "Commands: test | parsetest | install"

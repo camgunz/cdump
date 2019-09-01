@@ -5,27 +5,23 @@ import argparse
 
 import msgpack
 
-from cdump import parse_definitions
 from cdump.parser import Parser
-from cdump.xml_dump import XMLDump
 
 
-def dump_ast(file_path):
-    print(XMLDump.FromFilePath(file_path).as_xml())
+def parse(file_path, libclang=None):
+    for cdef in Parser(libclang).parse(file_path):
+        print(cdef)
 
 
-def dump_definitions(file_path):
-    for definition in Parser(XMLDump.FromFilePath(file_path)):
-        print(definition)
-
-
-def serialize_to_file(mp_file_name, file_paths):
+def serialize(mp_file_name, file_paths, libclang=None):
+    parser = Parser(libclang)
     with open(mp_file_name, 'wb') as fobj:
-        for name, definition in parse_definitions(file_paths).items():
-            msgpack.pack(definition.to_dict(), fobj, use_bin_type=True)
+        for file_path in file_paths:
+            for cdef in parser.parse(file_path):
+                msgpack.pack(cdef.to_dict(), fobj, use_bin_type=True)
 
 
-def deserialize_from_file(file_path):
+def deserialize(file_path):
     with open(file_path, 'rb') as fobj:
         unpacker = msgpack.Unpacker(fobj, raw=False)
         for definition in unpacker:
@@ -35,18 +31,24 @@ def deserialize_from_file(file_path):
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='action')
-    dump_subparser = subparsers.add_parser('dump')
-    dump_subparser.add_argument('input_file', type=str, help='File to dump')
     parse_subparser = subparsers.add_parser('parse')
     parse_subparser.add_argument('input_file', type=str, help='File to parse')
+    parse_subparser.add_argument(
+        '--libclang', type=str,
+        help='Path to libclang library'
+    )
     serialize_subparser = subparsers.add_parser('serialize')
     serialize_subparser.add_argument(
-        '-o', '--output', type=str,
-        help='Output for serialized definitions to'
+        '--libclang', type=str,
+        help='Path to libclang library'
     )
     serialize_subparser.add_argument(
         'input_files', type=str, nargs='+',
         help='Files to process'
+    )
+    serialize_subparser.add_argument(
+        '-o', '--output', type=str,
+        help='Output for serialized definitions to'
     )
     deserialize_subparser = subparsers.add_parser('deserialize')
     deserialize_subparser.add_argument(
@@ -56,14 +58,12 @@ def main():
 
     args = parser.parse_args()
 
-    if args.action == 'dump':
-        dump_ast(args.input_file)
-    elif args.action == 'parse':
-        dump_definitions(args.input_file)
+    if args.action == 'parse':
+        parse(args.input_file, args.libclang)
     elif args.action == 'serialize':
-        serialize_to_file(args.output, args.input_files)
+        serialize(args.output, args.input_files, args.libclang)
     elif args.action == 'deserialize':
-        deserialize_from_file(args.input_file)
+        deserialize(args.input_file)
 
 
 main()

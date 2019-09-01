@@ -1,40 +1,40 @@
-def joined(s, l):
+def join(s, l):
     return s.join(l)
 
 
-def concatenated(l):
-    return joined('', l)
+def concatenate(l):
+    return join('', l)
 
 
-def paired(s, a, b):
-    return joined(s, [str(a), str(b)])
+def pair(s, a, b):
+    return join(s, [str(a), str(b)])
 
 
-def surrounded(c, s):
-    return paired(s, c, c)
+def surround(c, s):
+    return pair(s, c, c)
 
 
 def snake_case(s):
-    return concatenated([
-        concatenated(['_', c.lower()]) if c.isupper() and n > 0 else c.lower()
+    return concatenate([
+        concatenate(['_', c.lower()]) if c.isupper() and n > 0 else c.lower()
         for n, c in enumerate(s)
     ])
 
 
-def single_quoted(x):
-    return surrounded("'", x) if isinstance(x, str) else x
+def single_quote(x):
+    return surround("'", x) if isinstance(x, str) else x
 
 
-def double_quoted(x):
-    return surrounded('"', x) if isinstance(x, str) else x
+def double_quote(x):
+    return surround('"', x) if isinstance(x, str) else x
 
 
-def comma_separated(l):
-    return joined(', ', map(str, l))
+def comma_separate(l):
+    return join(', ', map(str, l))
 
 
-def space_separated(l):
-    return joined(' ', map(str, l))
+def space_separate(l):
+    return join(' ', map(str, l))
 
 
 def intattr(node, attr_name):
@@ -45,8 +45,16 @@ def intattr(node, attr_name):
 
 
 def elemstr(el):
-    attrs = space_separated([
-        paired('=', attr_name, double_quoted(attr_value))
+    attrs = space_separate([
+        pair('=', attr_name, double_quote(attr_value))
         for attr_name, attr_value in el.items()
     ])
     return f'<{el.tag} {attrs}>'
+
+
+def id_gen(start=0):
+    n = start
+    yield n
+    while True:
+        n += 1
+        yield n
