@@ -144,9 +144,6 @@ class Parser:
             return BlockPointer(self._handle_type(pointee))
         if ctype.kind == TypeKind.INCOMPLETEARRAY:
             return Array(ctype.element_type.spelling)
-        print(f'Unknown ctype.kind {ctype.kind} ({ctype.spelling})')
-        import pdb
-        pdb.set_trace()
 
     def _handle_field(self, cursor):
         return self._handle_type(cursor.type)
@@ -168,20 +165,13 @@ class Parser:
             return self._handle_enum(cursor)
         elif cursor.kind == CursorKind.FUNCTION_DECL:
             return self._handle_function(cursor)
-        print(f'Unknown cursor.kind {cursor.kind} ({cursor.spelling})')
-        import pdb
-        pdb.set_trace()
 
     def _walk(self, cursor):
-        cdef = self._handle_cursor(cursor)
-        if cdef:
-            yield self._handle_cursor(cursor)
+        yield self._handle_cursor(cursor)
         for child in cursor.get_children():
-            cdef = self._handle_cursor(child)
-            if cdef:
-                yield cdef
+            yield self._handle_cursor(child)
 
     def parse(self, file_path):
         index = Index.create()
         translation_unit = index.parse(file_path)
-        return self._walk(translation_unit.cursor)
+        return filter(None, self._walk(translation_unit.cursor))
