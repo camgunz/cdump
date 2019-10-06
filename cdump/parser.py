@@ -7,10 +7,10 @@ from .cdefs import (
     Array,
     BlockFunctionPointer,
     BlockPointer,
-    BuiltinBool,
-    BuiltinFloatingPoint,
-    BuiltinInteger,
-    BuiltinVoid,
+    Bool,
+    FloatingPoint,
+    Integer,
+    Void,
     Enum,
     Function,
     FunctionPointer,
@@ -75,8 +75,11 @@ class Parser:
         )
 
     def _handle_struct(self, cursor):
+        name = cursor.type.spelling
+        if not name.startswith('struct '):
+            name = f'struct {name}'
         return Struct(
-            cursor.spelling,
+            name,
             OrderedDict([
                 (child.spelling, self._handle_cursor(child))
                 for child in cursor.get_children()
@@ -105,17 +108,17 @@ class Parser:
 
     def _handle_type(self, ctype):
         if ctype.kind == TypeKind.VOID:
-            return BuiltinVoid()
+            return Void()
         if ctype.kind == TypeKind.BOOL:
-            return BuiltinBoolean(ctype.get_size(), ctype.get_align())
+            return Boolean(ctype.get_size(), ctype.get_align())
         if ctype.kind in _BUILTIN_INTEGERS:
-            return BuiltinInteger(
+            return Integer(
                 ctype.spelling,
                 ctype.get_size(),
                 ctype.get_align()
             )
         if ctype.kind in _BUILTIN_FLOATING_POINTS:
-            return BuiltinFloatingPoint(
+            return FloatingPoint(
                 ctype.spelling,
                 ctype.get_size(),
                 ctype.get_align()

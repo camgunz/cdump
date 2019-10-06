@@ -64,24 +64,11 @@ class Array(CDef):
         self.element_count = element_count
 
 
-class BlockFunctionPointer(CDef):
-
-    __slots__ = ('parameters', 'return_type')
-
-    def __init__(self, parameters, return_type):
-        self.parameters = parameters
-        self.return_type = return_type
+class Builtin(CDef):
+    pass
 
 
-class BlockPointer(CDef):
-
-    __slots__ = ('base_type',)
-
-    def __init__(self, base_type):
-        self.base_type = base_type
-
-
-class BuiltinBool(CDef):
+class Bool(Builtin):
 
     __slots__ = ('name', 'size', 'alignment')
 
@@ -91,7 +78,7 @@ class BuiltinBool(CDef):
         self.alignment = alignment
 
 
-class BuiltinInteger(CDef):
+class Integer(Builtin):
 
     __slots__ = ('name', 'size', 'alignment')
 
@@ -101,7 +88,7 @@ class BuiltinInteger(CDef):
         self.alignment = alignment
 
 
-class BuiltinFloatingPoint(CDef):
+class FloatingPoint(Builtin):
 
     __slots__ = ('name', 'size', 'alignment')
 
@@ -111,7 +98,7 @@ class BuiltinFloatingPoint(CDef):
         self.alignment = alignment
 
 
-class BuiltinVoid(CDef):
+class Void(Builtin):
 
     __slots__ = ()
 
@@ -144,12 +131,26 @@ class FunctionPointer(CDef):
         self.return_type = return_type
 
 
+class BlockFunctionPointer(CDef):
+
+    __slots__ = ('parameters', 'return_type')
+
+    def __init__(self, parameters, return_type):
+        self.parameters = parameters
+        self.return_type = return_type
+
+
 class Pointer(CDef):
 
     __slots__ = ('base_type',)
 
     def __init__(self, base_type):
         self.base_type = base_type
+
+
+class BlockPointer(Pointer):
+
+    __slots__ = ('base_type',)
 
 
 class Reference(CDef):

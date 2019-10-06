@@ -7,7 +7,7 @@ setup(
     packages=find_packages(),
     scripts=['scripts/cdump'],
     install_requires=[
-        'lxml>=4.4.1',
+        'clang>=6.0.0.2',
         'msgpack>=0.6.1'
     ],
 

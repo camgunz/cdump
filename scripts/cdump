@@ -8,9 +8,11 @@ import msgpack
 from cdump.parser import Parser
 
 
-def parse(file_path, libclang=None):
-    for cdef in Parser(libclang).parse(file_path):
-        print(cdef)
+def parse(file_paths, libclang=None):
+    parser = Parser(libclang)
+    for file_path in file_paths:
+        for cdef in parser.parse(file_path):
+            pprint.pprint(cdef.to_dict())
 
 
 def serialize(mp_file_name, file_paths, libclang=None):
@@ -32,7 +34,10 @@ def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='action')
     parse_subparser = subparsers.add_parser('parse')
-    parse_subparser.add_argument('input_file', type=str, help='File to parse')
+    parse_subparser.add_argument(
+        'input_files', type=str, nargs='+',
+        help='Files to process'
+    )
     parse_subparser.add_argument(
         '--libclang', type=str,
         help='Path to libclang library'
@@ -59,7 +64,7 @@ def main():
     args = parser.parse_args()
 
     if args.action == 'parse':
-        parse(args.input_file, args.libclang)
+        parse(args.input_files, args.libclang)
     elif args.action == 'serialize':
         serialize(args.output, args.input_files, args.libclang)
     elif args.action == 'deserialize':

@@ -2,11 +2,13 @@
 
 test: install
 	rm -f defs.mp
-	cdump serialize --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' -o defs.mp /usr/include/stdlib.h /usr/include/stdio.h
+	cdump serialize -o defs.mp $$(cat musl-libc.txt)
+	# cdump serialize --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' -o defs.mp $$(cat musl-libc.txt)
 	cdump deserialize defs.mp
 
 parsetest: install
-	cdump parse --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' /usr/include/stdlib.h
+	cdump parse $$(cat musl-libc.txt)
+	# cdump parse --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' $$(cat musl-libc.txt)
 
 install:
 	python setup.py install
