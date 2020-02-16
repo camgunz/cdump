@@ -1,5 +1,4 @@
 from itertools import chain
-from collections import OrderedDict
 
 from clang.cindex import Config, CursorKind, Index, TypeKind
 
@@ -8,6 +7,7 @@ from .cdefs import (
     BlockFunctionPointer,
     BlockPointer,
     Bool,
+    Complex,
     FloatingPoint,
     Integer,
     Void,
@@ -71,7 +71,7 @@ class Parser:
     def _handle_union(self, cursor):
         return Union(
             f'union {cursor.type.spelling}',
-            list(map(self._handle_cursor, cursor.get_children()))
+            {c.spelling: self._handle_cursor(c) for c in cursor.get_children()}
         )
 
     def _handle_struct(self, cursor):
@@ -80,51 +80,67 @@ class Parser:
             name = f'struct {name}'
         return Struct(
             name,
-            OrderedDict([
-                (child.spelling, self._handle_cursor(child))
-                for child in cursor.get_children()
-            ])
+            {c.spelling: self._handle_cursor(c) for c in cursor.get_children()}
         )
 
     def _handle_enum(self, cursor):
         return Enum(
             self._handle_type(cursor.enum_type),
-            OrderedDict([
-                (child.spelling, child.enum_value)
+            {
+                child.spelling: child.enum_value
                 for child in cursor.get_children()
-            ])
+            }
         )
 
     def _handle_function(self, cursor):
         ids = id_gen()
+        param_names = (f'arg_{id}' for id in ids)
         return Function(
             cursor.spelling,
-            OrderedDict([
-                (param.spelling or next(ids), self._handle_type(param.type))
+            {
+                param.spelling or next(param_names):
+                self._handle_type(param.type)
                 for param in cursor.get_arguments()
-            ]),
+            },
             self._handle_type(cursor.result_type)
         )
 
     def _handle_type(self, ctype):
         if ctype.kind == TypeKind.VOID:
-            return Void()
+            return Void(ctype.is_const_qualified())
         if ctype.kind == TypeKind.BOOL:
-            return Boolean(ctype.get_size(), ctype.get_align())
+            return Boolean(
+                ctype.get_size(),
+                ctype.get_align(),
+                ctype.is_const_qualified(),
+                ctype.is_volatile_qualified()
+            )
         if ctype.kind in _BUILTIN_INTEGERS:
             return Integer(
                 ctype.spelling,
                 ctype.get_size(),
-                ctype.get_align()
+                ctype.get_align(),
+                ctype.is_const_qualified(),
+                ctype.is_volatile_qualified(),
             )
         if ctype.kind in _BUILTIN_FLOATING_POINTS:
             return FloatingPoint(
                 ctype.spelling,
                 ctype.get_size(),
-                ctype.get_align()
+                ctype.get_align(),
+                ctype.is_const_qualified(),
+                ctype.is_volatile_qualified(),
+            )
+        if ctype.kind == TypeKind.COMPLEX:
+            return Complex(
+                ctype.spelling,
+                ctype.get_size(),
+                ctype.get_align(),
+                ctype.is_const_qualified(),
+                ctype.is_volatile_qualified(),
             )
         if ctype.kind == TypeKind.CONSTANTARRAY:
-            return Array(ctype.element_type.spelling, ctype.element_count)
+            return Array(self._handle_type(ctype.element_type), ctype.element_count)
         if ctype.kind == TypeKind.TYPEDEF:
             return Reference(ctype.spelling)
         if ctype.kind == TypeKind.ELABORATED:
@@ -136,7 +152,12 @@ class Parser:
                     list(map(self._handle_type, pointee.argument_types())),
                     self._handle_type(pointee.get_result())
                 )
-            return Pointer(self._handle_type(pointee))
+            return Pointer(
+                self._handle_type(pointee),
+                ctype.is_const_qualified(),
+                not ctype.is_restrict_qualified(),
+                ctype.is_volatile_qualified()
+            )
         if ctype.kind == TypeKind.BLOCKPOINTER:
             pointee = ctype.get_pointee()
             if pointee.kind == TypeKind.FUNCTIONPROTO:

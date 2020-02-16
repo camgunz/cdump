@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 from .utils import comma_separate, pair, snake_case
 
 
@@ -27,7 +25,7 @@ class CDef:
 
     @property
     def attr_map(self):
-        return OrderedDict(zip(self.attr_names, self.attrs))
+        return dict(zip(self.attr_names, self.attrs))
 
     @property
     def attr_map_string(self):
@@ -36,7 +34,7 @@ class CDef:
         ])
 
     def to_dict(self):
-        od = OrderedDict([('obj_type', self.type_name)])
+        od = {'obj_type': self.type_name}
         for attr_name, attr in zip(self.attr_names, self.attrs):
             if isinstance(attr, CDef):
                 od[attr_name] = attr.to_dict()
@@ -45,11 +43,11 @@ class CDef:
                     x.to_dict() if isinstance(x, CDef) else x
                     for x in attr
                 ]
-            elif isinstance(attr, OrderedDict):
-                od[attr_name] = OrderedDict([
-                    (k, v.to_dict() if isinstance(v, CDef) else v)
+            elif isinstance(attr, dict):
+                od[attr_name] = {
+                    k: v.to_dict() if isinstance(v, CDef) else v
                     for k, v in attr.items()
-                ])
+                }
             else:
                 od[attr_name] = attr
         return od
@@ -64,43 +62,48 @@ class Array(CDef):
         self.element_count = element_count
 
 
-class Builtin(CDef):
-    pass
+class ScalarType(CDef):
 
+    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
 
-class Bool(Builtin):
-
-    __slots__ = ('name', 'size', 'alignment')
-
-    def __init__(self, name, size, alignment):
-        self.name = name
+    def __init__(self, name, size, alignment, is_const, is_volatile):
         self.size = size
         self.alignment = alignment
+        self.is_signed = not name.startswith('unsigned ')
+        self.is_const = is_const
+        self.is_volatile = is_volatile
 
 
-class Integer(Builtin):
+class Void(ScalarType):
 
-    __slots__ = ('name', 'size', 'alignment')
+    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
 
-    def __init__(self, name, size, alignment):
-        self.name = name
-        self.size = size
-        self.alignment = alignment
-
-
-class FloatingPoint(Builtin):
-
-    __slots__ = ('name', 'size', 'alignment')
-
-    def __init__(self, name, size, alignment):
-        self.name = name
-        self.size = size
-        self.alignment = alignment
+    def __init__(self, is_const):
+        super().__init__('void', None, None, is_const, False)
+        self.is_signed = False
 
 
-class Void(Builtin):
+class Bool(ScalarType):
 
-    __slots__ = ()
+    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
+
+    def __init__(self, size, alignment, is_const, is_volatile):
+        super().__init__('bool', size, alignment, is_const, is_volatile)
+
+
+class Integer(ScalarType):
+
+    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
+
+
+class FloatingPoint(ScalarType):
+
+    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
+
+
+class Complex(ScalarType):
+
+    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
 
 
 class Enum(CDef):
@@ -124,10 +127,10 @@ class Function(CDef):
 
 class FunctionPointer(CDef):
 
-    __slots__ = ('parameters', 'return_type')
+    __slots__ = ('parameter_types', 'return_type')
 
-    def __init__(self, parameters, return_type):
-        self.parameters = parameters
+    def __init__(self, parameter_types, return_type):
+        self.parameter_types = parameter_types
         self.return_type = return_type
 
 
@@ -142,10 +145,13 @@ class BlockFunctionPointer(CDef):
 
 class Pointer(CDef):
 
-    __slots__ = ('base_type',)
+    __slots__ = ('base_type', 'is_const', 'can_alias', 'is_volatile')
 
-    def __init__(self, base_type):
+    def __init__(self, base_type, is_const, can_alias, is_volatile):
         self.base_type = base_type
+        self.is_const = is_const
+        self.can_alias = can_alias
+        self.is_volatile = is_volatile
 
 
 class BlockPointer(Pointer):

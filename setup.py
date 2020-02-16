@@ -6,9 +6,10 @@ setup(
     version="0.0.1",
     packages=find_packages(),
     scripts=['scripts/cdump'],
+    python_requires='>=3.7.0',
     install_requires=[
-        'clang>=6.0.0.2',
-        'msgpack>=0.6.1'
+        line for line in open('requirements.txt', 'r').readlines()
+        if line and not line.startswith('-')
     ],
 
     # metadata to display on PyPI
