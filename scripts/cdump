@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 import pprint
 import argparse
 
@@ -69,6 +70,9 @@ def main():
         serialize(args.output, args.input_files, args.libclang)
     elif args.action == 'deserialize':
         deserialize(args.input_file)
+    else:
+        parser.print_help()
+        sys.exit(2)
 
 
 main()
