@@ -1,6 +1,12 @@
-from itertools import chain
+import os.path
 
-from clang.cindex import Config, CursorKind, Index, TypeKind
+from clang.cindex import (
+    Config,
+    CursorKind,
+    Index,
+    TranslationUnitLoadError,
+    TypeKind
+)
 
 from .cdefs import (
     Array,
@@ -21,7 +27,7 @@ from .cdefs import (
     Union
 )
 
-from .utils import id_gen
+from .utils import str_id_gen
 
 
 _BUILTIN_FLOATING_POINTS = [
@@ -63,14 +69,17 @@ class Parser:
     def _handle_typedef(self, cursor):
         typedef_type = cursor.underlying_typedef_type
         if typedef_type.kind == TypeKind.ELABORATED:
-            typedef_type = Reference(typedef_type.spelling)
+            typedef_type = Reference(
+                typedef_type.spelling,
+                typedef_type.is_const_qualified()
+            )
         else:
             typedef_type = self._handle_type(typedef_type)
         return Typedef(cursor.spelling, typedef_type)
 
     def _handle_union(self, cursor):
         return Union(
-            f'union {cursor.type.spelling}',
+            cursor.type.spelling if not cursor.is_anonymous() else None,
             {c.spelling: self._handle_cursor(c) for c in cursor.get_children()}
         )
 
@@ -79,7 +88,7 @@ class Parser:
         if not name.startswith('struct '):
             name = f'struct {name}'
         return Struct(
-            name,
+            name if not cursor.is_anonymous() else None,
             {c.spelling: self._handle_cursor(c) for c in cursor.get_children()}
         )
 
@@ -93,8 +102,7 @@ class Parser:
         )
 
     def _handle_function(self, cursor):
-        ids = id_gen()
-        param_names = (f'arg_{id}' for id in ids)
+        param_names = str_id_gen(prefix='arg_')
         return Function(
             cursor.spelling,
             {
@@ -109,7 +117,7 @@ class Parser:
         if ctype.kind == TypeKind.VOID:
             return Void(ctype.is_const_qualified())
         if ctype.kind == TypeKind.BOOL:
-            return Boolean(
+            return Bool(
                 ctype.get_size(),
                 ctype.get_align(),
                 ctype.is_const_qualified(),
@@ -140,11 +148,14 @@ class Parser:
                 ctype.is_volatile_qualified(),
             )
         if ctype.kind == TypeKind.CONSTANTARRAY:
-            return Array(self._handle_type(ctype.element_type), ctype.element_count)
+            return Array(
+                self._handle_type(ctype.element_type),
+                ctype.element_count
+            )
         if ctype.kind == TypeKind.TYPEDEF:
-            return Reference(ctype.spelling)
+            return Reference(ctype.spelling, ctype.is_const_qualified())
         if ctype.kind == TypeKind.ELABORATED:
-            return Reference(ctype.spelling)
+            return Reference(ctype.spelling, ctype.is_const_qualified())
         if ctype.kind == TypeKind.POINTER:
             pointee = ctype.get_pointee()
             if pointee.kind == TypeKind.FUNCTIONPROTO:
@@ -165,9 +176,14 @@ class Parser:
                     list(map(self._handle_type, pointee.argument_types())),
                     self._handle_type(pointee.get_result())
                 )
-            return BlockPointer(self._handle_type(pointee))
+            return BlockPointer(
+                self._handle_type(pointee),
+                ctype.is_const_qualified(),
+                not ctype.is_restrict_qualified(),
+                ctype.is_volatile_qualified()
+            )
         if ctype.kind == TypeKind.INCOMPLETEARRAY:
-            return Array(ctype.element_type.spelling)
+            return Array(self._handle_type(ctype.element_type))
 
     def _handle_field(self, cursor):
         return self._handle_type(cursor.type)
@@ -179,15 +195,15 @@ class Parser:
             return
         if cursor.kind == CursorKind.TYPEDEF_DECL:
             return self._handle_typedef(cursor)
-        elif cursor.kind == CursorKind.UNION_DECL:
+        if cursor.kind == CursorKind.UNION_DECL:
             return self._handle_union(cursor)
-        elif cursor.kind == CursorKind.FIELD_DECL:
+        if cursor.kind == CursorKind.FIELD_DECL:
             return self._handle_field(cursor)
-        elif cursor.kind == CursorKind.STRUCT_DECL:
+        if cursor.kind == CursorKind.STRUCT_DECL:
             return self._handle_struct(cursor)
-        elif cursor.kind == CursorKind.ENUM_DECL:
+        if cursor.kind == CursorKind.ENUM_DECL:
             return self._handle_enum(cursor)
-        elif cursor.kind == CursorKind.FUNCTION_DECL:
+        if cursor.kind == CursorKind.FUNCTION_DECL:
             return self._handle_function(cursor)
 
     def _walk(self, cursor):
@@ -197,5 +213,10 @@ class Parser:
 
     def parse(self, file_path):
         index = Index.create()
-        translation_unit = index.parse(file_path)
+        if not os.path.isfile(file_path):
+            return []
+        try:
+            translation_unit = index.parse(file_path)
+        except TranslationUnitLoadError as exc:
+            raise Exception(f'Error loading {file_path}: {exc}') from None
         return filter(None, self._walk(translation_unit.cursor))

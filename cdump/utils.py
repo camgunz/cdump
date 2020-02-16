@@ -58,3 +58,7 @@ def id_gen(start=0):
     while True:
         n += 1
         yield n
+
+def str_id_gen(start=0, prefix=''):
+    for n in id_gen(start=start):
+        yield f'{prefix}{n}'

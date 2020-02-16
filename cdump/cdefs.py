@@ -156,24 +156,30 @@ class Pointer(CDef):
 
 class BlockPointer(Pointer):
 
-    __slots__ = ('base_type',)
+    __slots__ = ('base_type', 'is_const', 'can_alias', 'is_volatile')
 
 
 class Reference(CDef):
 
-    __slots__ = ('target',)
+    __slots__ = ('target', 'is_const')
 
-    def __init__(self, target):
+    def __init__(self, target, is_const):
+        if target.startswith('const '):
+            target = target[6:]
         self.target = target
+        self.is_const = is_const
 
 
 class Struct(CDef):
 
-    __slots__ = ('name', 'fields')
+    __slots__ = ('name', 'fields', 'is_anonymous')
 
     def __init__(self, name, fields):
+        if name is not None and name.startswith('const '):
+            name = name[6:]
         self.name = name
         self.fields = fields
+        self.is_anonymous = name is None
 
 
 class Typedef(CDef):
@@ -181,14 +187,19 @@ class Typedef(CDef):
     __slots__ = ('name', 'type')
 
     def __init__(self, name, type):
+        if name.startswith('const '):
+            name = name[6:]
         self.name = name
         self.type = type
 
 
 class Union(CDef):
 
-    __slots__ = ('name', 'fields')
+    __slots__ = ('name', 'fields', 'is_anonymous')
 
     def __init__(self, name, fields):
+        if name is not None and name.startswith('const '):
+            name = name[6:]
         self.name = name
         self.fields = fields
+        self.is_anonymous = name is None
