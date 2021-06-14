@@ -1,23 +1,33 @@
-.PHONY: test parsetest install help
+.PHONY: help venv depinstall install linux_test macos_test linux_parsetest macos_parsetest
 
 help:
-	@echo "Commands: test | parsetest | install"
+	@echo "Commands: linux_test | linux_parsetest | macos_test | macos_parsetest"
+	@echo "          depinstall | install"
 
 venv:
 ifeq ($(VIRTUAL_ENV), )
 	$(error "Not running in a virtualenv")
 endif
 
-install: venv
-	python setup.py install
+depinstall: venv
+	@pip install -r dev-requirements.txt
 
-test: install
-	rm -f defs.mp
-	cdump serialize -o defs.mp $$(cat musl-libc.txt)
-	# cdump serialize --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' -o defs.mp $$(cat musl-libc.txt)
-	cdump deserialize defs.mp
+install: depinstall
+	@python setup.py install
 
-parsetest: install
-	cdump parse $$(cat musl-libc.txt)
-	# cdump parse --libclang='/usr/local/Cellar/llvm/8.0.0_1/Toolchains/LLVM8.0.0.xctoolchain/usr/lib/libclang.dylib' $$(cat musl-libc.txt)
+linux_test: install
+	@rm -f defs.mp
+	@cdump serialize -o defs.mp $$(cat musl-libc.txt)
+	@cdump deserialize defs.mp
+
+macos_test: install
+	@rm -f defs.mp
+	@cdump serialize --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib -o defs.mp $$(cat macos-libc.txt)
+	@cdump deserialize defs.mp
+
+linux_parsetest: install
+	@cdump parse $$(cat musl-libc.txt)
+
+macos_parsetest: install
+	@cdump parse --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib $$(cat macos-libc.txt)
 

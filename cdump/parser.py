@@ -68,13 +68,17 @@ class Parser:
 
     def _handle_typedef(self, cursor):
         typedef_type = cursor.underlying_typedef_type
-        if typedef_type.kind == TypeKind.ELABORATED:
-            typedef_type = Reference(
-                typedef_type.spelling,
-                typedef_type.is_const_qualified()
-            )
-        else:
+        if typedef_type.kind != TypeKind.ELABORATED:
             typedef_type = self._handle_type(typedef_type)
+        else:
+            decl = typedef_type.get_declaration()
+            if decl.is_anonymous() and decl.kind == CursorKind.STRUCT_DECL:
+                typedef_type = self._handle_struct(decl)
+            else:
+                typedef_type = Reference(
+                    typedef_type.spelling,
+                    typedef_type.is_const_qualified()
+                )
         return Typedef(cursor.spelling, typedef_type)
 
     def _handle_union(self, cursor):

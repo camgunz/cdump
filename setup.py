@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="cdump",
-    version="0.0.1",
+    version="0.0.2",
     packages=find_packages(),
     scripts=['scripts/cdump'],
     python_requires='>=3.7.0',
@@ -19,7 +19,7 @@ setup(
     keywords="c",
     url="https://github.com/camgunz/cdump/",
     project_urls={
-        "Source Code": "https://gitub.com/camgunz/cdump",
+        "Source Code": "https://github.com/camgunz/cdump",
     },
     classifiers=[
         'License :: OSI Approved :: GPLv3'

@@ -1,12 +1,21 @@
 #!/usr/bin/env python
 
 import sys
+import json
 import pprint
 import argparse
 
 import msgpack
 
 from cdump.parser import Parser
+
+
+def msgpack_packer(cdef, fobj):
+    return msgpack.pack(cdef.to_dict(), fobj, use_bin_type=True)
+
+
+def json_packer(cdef, fobj):
+    return json.dump(cdef.to_dict(), fobj, indent=2)
 
 
 def parse(file_paths, libclang=None):
@@ -16,12 +25,14 @@ def parse(file_paths, libclang=None):
             pprint.pprint(cdef.to_dict())
 
 
-def serialize(mp_file_name, file_paths, libclang=None):
+def serialize(mp_file_name, file_paths, format='msgpack', libclang=None):
     parser = Parser(libclang)
-    with open(mp_file_name, 'wb') as fobj:
+    pack = json_packer if format == 'json' else msgpack_packer
+    mode = 'w' if format == 'json' else 'wb'
+    with open(mp_file_name, mode) as fobj:
         for file_path in file_paths:
             for cdef in parser.parse(file_path):
-                msgpack.pack(cdef.to_dict(), fobj, use_bin_type=True)
+                pack(cdef, fobj)
 
 
 def deserialize(file_path):
@@ -34,6 +45,7 @@ def deserialize(file_path):
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='action')
+
     parse_subparser = subparsers.add_parser('parse')
     parse_subparser.add_argument(
         'input_files', type=str, nargs='+',
@@ -43,7 +55,12 @@ def main():
         '--libclang', type=str,
         help='Path to libclang library'
     )
+
     serialize_subparser = subparsers.add_parser('serialize')
+    serialize_subparser.add_argument(
+        '--format', type=str, default='msgpack',
+        help='Format to serialize to, "json" and "msgpack" supported'
+    )
     serialize_subparser.add_argument(
         '--libclang', type=str,
         help='Path to libclang library'
@@ -56,6 +73,7 @@ def main():
         '-o', '--output', type=str,
         help='Output for serialized definitions to'
     )
+
     deserialize_subparser = subparsers.add_parser('deserialize')
     deserialize_subparser.add_argument(
         'input_file', type=str,
@@ -67,7 +85,7 @@ def main():
     if args.action == 'parse':
         parse(args.input_files, args.libclang)
     elif args.action == 'serialize':
-        serialize(args.output, args.input_files, args.libclang)
+        serialize(args.output, args.input_files, args.format, args.libclang)
     elif args.action == 'deserialize':
         deserialize(args.input_file)
     else:
