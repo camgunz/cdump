@@ -1,4 +1,5 @@
 import os.path
+import subprocess
 
 from clang.cindex import (
     Config,
@@ -62,7 +63,8 @@ _BUILTIN_INTEGERS = [
 
 class Parser:
 
-    def __init__(self, libclang=None):
+    def __init__(self, preprocessor, libclang=None):
+        self._preprocessor = preprocessor
         if libclang:
             Config.set_library_file(libclang)
 
@@ -216,11 +218,18 @@ class Parser:
             yield self._handle_cursor(child)
 
     def parse(self, file_path):
-        index = Index.create()
         if not os.path.isfile(file_path):
             return []
-        try:
-            translation_unit = index.parse(file_path)
-        except TranslationUnitLoadError as exc:
-            raise Exception(f'Error loading {file_path}: {exc}') from None
-        return filter(None, self._walk(translation_unit.cursor))
+
+        cmd = [self._preprocessor, '-E', file_path]
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE) as cpp:
+            index = Index.create()
+            try:
+                translation_unit = index.parse(
+                    file_path,
+                    unsaved_files=[(file_path, cpp.stdout)]
+                )
+            except TranslationUnitLoadError as exc:
+                raise Exception(f'Error loading {file_path}: {exc}') from None
+
+            return filter(None, self._walk(translation_unit.cursor))

@@ -22,12 +22,12 @@ linux_test: install
 
 macos_test: install
 	@rm -f defs.mp
-	@cdump serialize --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib -o defs.mp $$(cat macos-libc.txt)
-	@cdump deserialize defs.mp
+	@cdump serialize --preprocessor=/usr/bin/clang --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib -o defs.mp $$(cat macos-libc.txt)
+	# @cdump deserialize defs.mp
 
 linux_parsetest: install
 	@cdump parse $$(cat musl-libc.txt)
 
 macos_parsetest: install
-	@cdump parse --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib $$(cat macos-libc.txt)
+	@cdump parse --preprocessor=/usr/bin/clang --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib $$(cat macos-libc.txt)
 

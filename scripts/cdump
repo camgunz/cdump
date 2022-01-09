@@ -18,15 +18,16 @@ def json_packer(cdef, fobj):
     return json.dump(cdef.to_dict(), fobj, indent=2)
 
 
-def parse(file_paths, libclang=None):
-    parser = Parser(libclang)
+def parse(file_paths, preprocessor, libclang=None):
+    parser = Parser(preprocessor, libclang)
     for file_path in file_paths:
         for cdef in parser.parse(file_path):
             pprint.pprint(cdef.to_dict())
 
 
-def serialize(mp_file_name, file_paths, format='msgpack', libclang=None):
-    parser = Parser(libclang)
+def serialize(mp_file_name, file_paths, preprocessor, format='msgpack',
+              libclang=None):
+    parser = Parser(preprocessor, libclang)
     pack = json_packer if format == 'json' else msgpack_packer
     mode = 'w' if format == 'json' else 'wb'
     with open(mp_file_name, mode) as fobj:
@@ -52,11 +53,23 @@ def main():
         help='Files to process'
     )
     parse_subparser.add_argument(
+        '--preprocessor', type=str, required=True,
+        help='Path to C preprocessor executable'
+    )
+    parse_subparser.add_argument(
         '--libclang', type=str,
         help='Path to libclang library'
     )
 
     serialize_subparser = subparsers.add_parser('serialize')
+    serialize_subparser.add_argument(
+        'input_files', type=str, nargs='+',
+        help='Files to process'
+    )
+    serialize_subparser.add_argument(
+        '--preprocessor', type=str, required=True,
+        help='Path to C preprocessor executable'
+    )
     serialize_subparser.add_argument(
         '--format', type=str, default='msgpack',
         help='Format to serialize to, "json" and "msgpack" supported'
@@ -64,10 +77,6 @@ def main():
     serialize_subparser.add_argument(
         '--libclang', type=str,
         help='Path to libclang library'
-    )
-    serialize_subparser.add_argument(
-        'input_files', type=str, nargs='+',
-        help='Files to process'
     )
     serialize_subparser.add_argument(
         '-o', '--output', type=str,
@@ -83,9 +92,15 @@ def main():
     args = parser.parse_args()
 
     if args.action == 'parse':
-        parse(args.input_files, args.libclang)
+        parse(args.input_files, args.preprocessor, args.libclang)
     elif args.action == 'serialize':
-        serialize(args.output, args.input_files, args.format, args.libclang)
+        serialize(
+            args.output,
+            args.input_files,
+            args.preprocessor,
+            args.format,
+            args.libclang,
+        )
     elif args.action == 'deserialize':
         deserialize(args.input_file)
     else:
