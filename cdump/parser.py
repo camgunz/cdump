@@ -108,7 +108,7 @@ class Parser:
         )
 
     def _handle_function(self, cursor):
-        param_names = str_id_gen(prefix='arg_')
+        param_names = str_id_gen(prefix='param_')
         return Function(
             cursor.spelling,
             {
@@ -165,8 +165,12 @@ class Parser:
         if ctype.kind == TypeKind.POINTER:
             pointee = ctype.get_pointee()
             if pointee.kind == TypeKind.FUNCTIONPROTO:
+                param_names = str_id_gen(prefix='param_')
                 return FunctionPointer(
-                    list(map(self._handle_type, pointee.argument_types())),
+                    dict(zip(
+                        str_id_gen(prefix='param_'),
+                        map(self._handle_type, pointee.argument_types())
+                    )),
                     self._handle_type(pointee.get_result())
                 )
             return Pointer(
@@ -179,7 +183,10 @@ class Parser:
             pointee = ctype.get_pointee()
             if pointee.kind == TypeKind.FUNCTIONPROTO:
                 return BlockFunctionPointer(
-                    list(map(self._handle_type, pointee.argument_types())),
+                    dict(zip(
+                        str_id_gen(prefix='param_'),
+                        map(self._handle_type, pointee.argument_types())
+                    )),
                     self._handle_type(pointee.get_result())
                 )
             return BlockPointer(
@@ -195,10 +202,6 @@ class Parser:
         return self._handle_type(cursor.type)
 
     def _handle_cursor(self, cursor):
-        if cursor.kind == CursorKind.TRANSLATION_UNIT:
-            return
-        if cursor.kind == CursorKind.VAR_DECL:
-            return
         if cursor.kind == CursorKind.TYPEDEF_DECL:
             return self._handle_typedef(cursor)
         if cursor.kind == CursorKind.UNION_DECL:
@@ -211,6 +214,12 @@ class Parser:
             return self._handle_enum(cursor)
         if cursor.kind == CursorKind.FUNCTION_DECL:
             return self._handle_function(cursor)
+        if cursor.kind == CursorKind.TRANSLATION_UNIT:
+            return
+        if cursor.kind == CursorKind.VAR_DECL:
+            return
+        if cursor.kind == CursorKind.PACKED_ATTR:
+            return
 
     def _walk(self, cursor):
         yield self._handle_cursor(cursor)

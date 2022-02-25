@@ -17,7 +17,7 @@ install: depinstall
 
 linux_test: install
 	@rm -f defs.mp
-	@cdump serialize -o defs.mp $$(cat musl-libc.txt)
+	@cdump serialize --preprocessor=/usr/bin/clang -o defs.mp $$(cat musl-libc.txt)
 	@cdump deserialize defs.mp
 
 macos_test: install
@@ -25,8 +25,13 @@ macos_test: install
 	@cdump serialize --preprocessor=/usr/bin/clang --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib -o defs.mp $$(cat macos-libc.txt)
 	# @cdump deserialize defs.mp
 
+macos_test_json: install
+	@rm -f defs.mp
+	@cdump serialize --preprocessor=/usr/bin/clang --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib --format=json -o defs.json $$(cat macos-libc.txt)
+	# @cdump deserialize defs.mp
+
 linux_parsetest: install
-	@cdump parse $$(cat musl-libc.txt)
+	@cdump parse --preprocessor=/usr/bin/clang $$(cat musl-libc.txt)
 
 macos_parsetest: install
 	@cdump parse --preprocessor=/usr/bin/clang --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib $$(cat macos-libc.txt)

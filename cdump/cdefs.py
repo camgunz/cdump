@@ -127,10 +127,10 @@ class Function(CDef):
 
 class FunctionPointer(CDef):
 
-    __slots__ = ('parameter_types', 'return_type')
+    __slots__ = ('parameters', 'return_type')
 
-    def __init__(self, parameter_types, return_type):
-        self.parameter_types = parameter_types
+    def __init__(self, parameters, return_type):
+        self.parameters = parameters
         self.return_type = return_type
 
 
