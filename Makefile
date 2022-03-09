@@ -1,7 +1,8 @@
 .PHONY: help venv depinstall install linux_test macos_test linux_parsetest macos_parsetest
 
 help:
-	@echo "Commands: linux_test | linux_parsetest | macos_test | macos_parsetest"
+	@echo "Commands: linux_test | linux_parsetest |"
+	@echo "          macos_test | macos_test_json | macos_parsetest |"
 	@echo "          depinstall | install"
 
 venv:
@@ -28,7 +29,6 @@ macos_test: install
 macos_test_json: install
 	@rm -f defs.mp
 	@cdump serialize --preprocessor=/usr/bin/clang --libclang=/Library/Developer/CommandLineTools/usr/lib/libclang.dylib --format=json -o defs.json $$(cat macos-libc.txt)
-	# @cdump deserialize defs.mp
 
 linux_parsetest: install
 	@cdump parse --preprocessor=/usr/bin/clang $$(cat musl-libc.txt)

@@ -53,20 +53,13 @@ class CDef:
         return od
 
 
-class Array(CDef):
-
-    __slots__ = ('element_type', 'element_count')
-
-    def __init__(self, element_type, element_count=None):
-        self.element_type = element_type
-        self.element_count = element_count
-
-
 class ScalarType(CDef):
 
-    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
+    __slots__ = ('name', 'size', 'alignment', 'is_signed', 'is_const',
+                 'is_volatile')
 
     def __init__(self, name, size, alignment, is_const, is_volatile):
+        self.name = name
         self.size = size
         self.alignment = alignment
         self.is_signed = not name.startswith('unsigned ')
@@ -93,12 +86,22 @@ class Bool(ScalarType):
 
 class Integer(ScalarType):
 
-    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
+    __slots__ = (
+        'name', 'size', 'alignment', 'is_signed', 'is_const', 'is_volatile',
+        'is_bitfield', 'bitfield_width'
+    )
+
+    def __init__(self, name, size, alignment, is_const, is_volatile,
+                 is_bitfield, bitfield_width):
+        super().__init__(name, size, alignment, is_const, is_volatile)
+        self.is_bitfield = is_bitfield
+        self.bitfield_width = bitfield_width
 
 
 class FloatingPoint(ScalarType):
 
-    __slots__ = ('size', 'alignment', 'is_signed', 'is_const', 'is_volatile')
+    __slots__ = ('name', 'size', 'alignment', 'is_signed', 'is_const',
+                 'is_volatile')
 
 
 class Complex(ScalarType):
@@ -168,6 +171,15 @@ class Reference(CDef):
             target = target[6:]
         self.target = target
         self.is_const = is_const
+
+
+class Array(CDef):
+
+    __slots__ = ('element_type', 'element_count')
+
+    def __init__(self, element_type, element_count=None):
+        self.element_type = element_type
+        self.element_count = element_count
 
 
 class Struct(CDef):

@@ -1,7 +1,7 @@
 import os.path
 import subprocess
 
-from clang.cindex import (
+from clang.cindex import (  # pylint: disable=import-error
     Config,
     CursorKind,
     Index,
@@ -71,7 +71,7 @@ class Parser:
     def _handle_typedef(self, cursor):
         typedef_type = cursor.underlying_typedef_type
         if typedef_type.kind != TypeKind.ELABORATED:
-            typedef_type = self._handle_type(typedef_type)
+            typedef_type = self._handle_type(cursor, typedef_type)
         else:
             decl = typedef_type.get_declaration()
             if decl.is_anonymous() and decl.kind == CursorKind.STRUCT_DECL:
@@ -84,10 +84,26 @@ class Parser:
         return Typedef(cursor.spelling, typedef_type)
 
     def _handle_union(self, cursor):
-        return Union(
-            cursor.type.spelling if not cursor.is_anonymous() else None,
-            {c.spelling: self._handle_cursor(c) for c in cursor.get_children()}
-        )
+        name = cursor.type.spelling
+        if not name.startswith('union '):
+            name = f'union {name}'
+        fields = {}
+        for child in cursor.get_children():
+            if child.type.kind != TypeKind.ELABORATED:
+                if child.kind == CursorKind.STRUCT_DECL:
+                    # Ignore these and wait for the elaborated ref later
+                    continue
+                fields[child.spelling] = self._handle_cursor(child)
+            elif len(list(child.get_children())) != 1:
+                fields[child.spelling] = self._handle_cursor(child)
+            elif next(child.get_children()).type.kind != TypeKind.RECORD:
+                fields[child.spelling] = self._handle_cursor(child)
+            else:
+                record_fields = {}
+                for rc in next(child.get_children()).get_children():
+                    record_fields[rc.spelling] = self._handle_cursor(rc)
+                fields[child.spelling] = Struct(child.spelling, record_fields)
+        return Union(name if not cursor.is_anonymous() else None, fields)
 
     def _handle_struct(self, cursor):
         name = cursor.type.spelling
@@ -100,7 +116,7 @@ class Parser:
 
     def _handle_enum(self, cursor):
         return Enum(
-            self._handle_type(cursor.enum_type),
+            self._handle_type(cursor, cursor.enum_type),
             {
                 child.spelling: child.enum_value
                 for child in cursor.get_children()
@@ -113,13 +129,13 @@ class Parser:
             cursor.spelling,
             {
                 param.spelling or next(param_names):
-                self._handle_type(param.type)
+                self._handle_type(cursor, param.type)
                 for param in cursor.get_arguments()
             },
-            self._handle_type(cursor.result_type)
+            self._handle_type(cursor, cursor.result_type)
         )
 
-    def _handle_type(self, ctype):
+    def _handle_type(self, cursor, ctype):
         if ctype.kind == TypeKind.VOID:
             return Void(ctype.is_const_qualified())
         if ctype.kind == TypeKind.BOOL:
@@ -136,6 +152,8 @@ class Parser:
                 ctype.get_align(),
                 ctype.is_const_qualified(),
                 ctype.is_volatile_qualified(),
+                cursor.is_bitfield(),
+                cursor.get_bitfield_width()
             )
         if ctype.kind in _BUILTIN_FLOATING_POINTS:
             return FloatingPoint(
@@ -155,7 +173,7 @@ class Parser:
             )
         if ctype.kind == TypeKind.CONSTANTARRAY:
             return Array(
-                self._handle_type(ctype.element_type),
+                self._handle_type(cursor, ctype.element_type),
                 ctype.element_count
             )
         if ctype.kind == TypeKind.TYPEDEF:
@@ -165,16 +183,18 @@ class Parser:
         if ctype.kind == TypeKind.POINTER:
             pointee = ctype.get_pointee()
             if pointee.kind == TypeKind.FUNCTIONPROTO:
-                param_names = str_id_gen(prefix='param_')
                 return FunctionPointer(
                     dict(zip(
                         str_id_gen(prefix='param_'),
-                        map(self._handle_type, pointee.argument_types())
+                        map(
+                            lambda t: self._handle_type(cursor, t),
+                            pointee.argument_types()
+                        )
                     )),
-                    self._handle_type(pointee.get_result())
+                    self._handle_type(cursor, pointee.get_result())
                 )
             return Pointer(
-                self._handle_type(pointee),
+                self._handle_type(cursor, pointee),
                 ctype.is_const_qualified(),
                 not ctype.is_restrict_qualified(),
                 ctype.is_volatile_qualified()
@@ -185,21 +205,24 @@ class Parser:
                 return BlockFunctionPointer(
                     dict(zip(
                         str_id_gen(prefix='param_'),
-                        map(self._handle_type, pointee.argument_types())
+                        map(
+                            lambda t: self._handle_type(cursor, t),
+                            pointee.argument_types()
+                        )
                     )),
-                    self._handle_type(pointee.get_result())
+                    self._handle_type(cursor, pointee.get_result())
                 )
             return BlockPointer(
-                self._handle_type(pointee),
+                self._handle_type(cursor, pointee),
                 ctype.is_const_qualified(),
                 not ctype.is_restrict_qualified(),
                 ctype.is_volatile_qualified()
             )
         if ctype.kind == TypeKind.INCOMPLETEARRAY:
-            return Array(self._handle_type(ctype.element_type))
+            return Array(self._handle_type(cursor, ctype.element_type))
 
     def _handle_field(self, cursor):
-        return self._handle_type(cursor.type)
+        return self._handle_type(cursor, cursor.type)
 
     def _handle_cursor(self, cursor):
         if cursor.kind == CursorKind.TYPEDEF_DECL:
