@@ -29,9 +29,7 @@ class CDef:
 
     @property
     def attr_map_string(self):
-        return comma_separate([
-            pair('=', *x) for x in self.attr_map.items()
-        ])
+        return comma_separate([pair('=', *x) for x in self.attr_map.items()])
 
     def to_dict(self):
         od = {'obj_type': self.type_name}
@@ -40,13 +38,13 @@ class CDef:
                 od[attr_name] = attr.to_dict()
             elif isinstance(attr, list):
                 od[attr_name] = [
-                    x.to_dict() if isinstance(x, CDef) else x
-                    for x in attr
+                    x.to_dict() if isinstance(x, CDef) else x for x in attr
                 ]
             elif isinstance(attr, dict):
                 od[attr_name] = {
                     k: v.to_dict() if isinstance(v, CDef) else v
-                    for k, v in attr.items()
+                    for k,
+                    v in attr.items()
                 }
             else:
                 od[attr_name] = attr
@@ -55,8 +53,9 @@ class CDef:
 
 class ScalarType(CDef):
 
-    __slots__ = ('name', 'size', 'alignment', 'is_signed', 'is_const',
-                 'is_volatile')
+    __slots__ = (
+        'name', 'size', 'alignment', 'is_signed', 'is_const', 'is_volatile'
+    )
 
     def __init__(self, name, size, alignment, is_const, is_volatile):
         self.name = name
@@ -87,12 +86,26 @@ class Bool(ScalarType):
 class Integer(ScalarType):
 
     __slots__ = (
-        'name', 'size', 'alignment', 'is_signed', 'is_const', 'is_volatile',
-        'is_bitfield', 'bitfield_width'
+        'name',
+        'size',
+        'alignment',
+        'is_signed',
+        'is_const',
+        'is_volatile',
+        'is_bitfield',
+        'bitfield_width'
     )
 
-    def __init__(self, name, size, alignment, is_const, is_volatile,
-                 is_bitfield, bitfield_width):
+    def __init__(
+        self,
+        name,
+        size,
+        alignment,
+        is_const,
+        is_volatile,
+        is_bitfield,
+        bitfield_width
+    ):
         super().__init__(name, size, alignment, is_const, is_volatile)
         self.is_bitfield = is_bitfield
         self.bitfield_width = bitfield_width
@@ -100,8 +113,9 @@ class Integer(ScalarType):
 
 class FloatingPoint(ScalarType):
 
-    __slots__ = ('name', 'size', 'alignment', 'is_signed', 'is_const',
-                 'is_volatile')
+    __slots__ = (
+        'name', 'size', 'alignment', 'is_signed', 'is_const', 'is_volatile'
+    )
 
 
 class Complex(ScalarType):
@@ -175,9 +189,10 @@ class Reference(CDef):
 
 class Array(CDef):
 
-    __slots__ = ('element_type', 'element_count')
+    __slots__ = ('name', 'element_type', 'element_count')
 
-    def __init__(self, element_type, element_count=None):
+    def __init__(self, name, element_type, element_count=None):
+        self.name = name
         self.element_type = element_type
         self.element_count = element_count
 

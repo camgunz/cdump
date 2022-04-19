@@ -39,7 +39,6 @@ _BUILTIN_FLOATING_POINTS = [
     TypeKind.FLOAT128,
 ]
 
-
 _BUILTIN_INTEGERS = [
     TypeKind.CHAR16,
     TypeKind.CHAR32,
@@ -78,8 +77,7 @@ class Parser:
                 typedef_type = self._handle_struct(decl)
             else:
                 typedef_type = Reference(
-                    typedef_type.spelling,
-                    typedef_type.is_const_qualified()
+                    typedef_type.spelling, typedef_type.is_const_qualified()
                 )
         return Typedef(cursor.spelling, typedef_type)
 
@@ -110,8 +108,10 @@ class Parser:
         if not name.startswith('struct '):
             name = f'struct {name}'
         return Struct(
-            name if not cursor.is_anonymous() else None,
-            {c.spelling: self._handle_cursor(c) for c in cursor.get_children()}
+            name if not cursor.is_anonymous() else None, {
+                c.spelling: self._handle_cursor(c)
+                for c in cursor.get_children()
+            }
         )
 
     def _handle_enum(self, cursor):
@@ -172,9 +172,14 @@ class Parser:
                 ctype.is_volatile_qualified(),
             )
         if ctype.kind == TypeKind.CONSTANTARRAY:
+            if cursor.kind == CursorKind.FIELD_DECL:
+                name = None
+            else:
+                name = cursor.spelling
             return Array(
-                self._handle_type(cursor, ctype.element_type),
-                ctype.element_count
+                name=name,
+                element_type=self._handle_type(cursor, ctype.element_type),
+                element_count=ctype.element_count
             )
         if ctype.kind == TypeKind.TYPEDEF:
             return Reference(ctype.spelling, ctype.is_const_qualified())
@@ -184,13 +189,15 @@ class Parser:
             pointee = ctype.get_pointee()
             if pointee.kind == TypeKind.FUNCTIONPROTO:
                 return FunctionPointer(
-                    dict(zip(
-                        str_id_gen(prefix='param_'),
-                        map(
-                            lambda t: self._handle_type(cursor, t),
-                            pointee.argument_types()
+                    dict(
+                        zip(
+                            str_id_gen(prefix='param_'),
+                            map(
+                                lambda t: self._handle_type(cursor, t),
+                                pointee.argument_types()
+                            )
                         )
-                    )),
+                    ),
                     self._handle_type(cursor, pointee.get_result())
                 )
             return Pointer(
@@ -203,13 +210,15 @@ class Parser:
             pointee = ctype.get_pointee()
             if pointee.kind == TypeKind.FUNCTIONPROTO:
                 return BlockFunctionPointer(
-                    dict(zip(
-                        str_id_gen(prefix='param_'),
-                        map(
-                            lambda t: self._handle_type(cursor, t),
-                            pointee.argument_types()
+                    dict(
+                        zip(
+                            str_id_gen(prefix='param_'),
+                            map(
+                                lambda t: self._handle_type(cursor, t),
+                                pointee.argument_types()
+                            )
                         )
-                    )),
+                    ),
                     self._handle_type(cursor, pointee.get_result())
                 )
             return BlockPointer(
@@ -219,7 +228,11 @@ class Parser:
                 ctype.is_volatile_qualified()
             )
         if ctype.kind == TypeKind.INCOMPLETEARRAY:
-            return Array(self._handle_type(cursor, ctype.element_type))
+            return Array(
+                name=None,
+                element_type=self._handle_type(cursor, ctype.element_type),
+                element_count=None
+            )
 
     def _handle_field(self, cursor):
         return self._handle_type(cursor, cursor.type)
@@ -258,8 +271,7 @@ class Parser:
             index = Index.create()
             try:
                 translation_unit = index.parse(
-                    file_path,
-                    unsaved_files=[(file_path, cpp.stdout)]
+                    file_path, unsaved_files=[(file_path, cpp.stdout)]
                 )
             except TranslationUnitLoadError as exc:
                 raise Exception(f'Error loading {file_path}: {exc}') from None
