@@ -172,7 +172,8 @@ class Parser:
                 ctype.is_volatile_qualified(),
             )
         if ctype.kind == TypeKind.CONSTANTARRAY:
-            if cursor.kind == CursorKind.FIELD_DECL:
+            if cursor.kind in (CursorKind.FIELD_DECL,
+                               CursorKind.FUNCTION_DECL):
                 name = None
             else:
                 name = cursor.spelling
