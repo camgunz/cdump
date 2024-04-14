@@ -125,9 +125,10 @@ class Complex(ScalarType):
 
 class Enum(CDef):
 
-    __slots__ = ('type', 'values')
+    __slots__ = ('name', 'type', 'values')
 
-    def __init__(self, enum_type, values):
+    def __init__(self, name, enum_type, values):
+        self.name = name
         self.type = enum_type
         self.values = values
 

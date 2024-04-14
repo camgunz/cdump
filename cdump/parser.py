@@ -115,9 +115,16 @@ class Parser:
         )
 
     def _handle_enum(self, cursor):
+        if cursor.is_anonymous():
+            name = None
+        else:
+            name = cursor.type.spelling
+            if not name.startswith('enum'):
+                name = f'enum {name}'
         return Enum(
-            self._handle_type(cursor, cursor.enum_type),
-            {
+            name=name,
+            enum_type=self._handle_type(cursor, cursor.enum_type),
+            values={
                 child.spelling: child.enum_value
                 for child in cursor.get_children()
             }
